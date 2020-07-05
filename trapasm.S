@@ -20,7 +20,9 @@ alltraps:
   call trap
   addl $4, %esp
 
+  # There is no ret for alltraps, so
   # Return falls through to trapret...
+  # Continue to execute trapret after `addl $4, %esp`
 .globl trapret
 trapret:
   popal

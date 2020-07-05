@@ -100,6 +100,49 @@ xv6memfs.img: bootblock kernelmemfs
 	dd if=bootblock of=xv6memfs.img conv=notrunc
 	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
 
+# https://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_node/ld_3.html#SEC3
+# LD command
+# -e Label	Sets the entry point of the executable output file to Label. 
+# The default entry point is __start (double underscore start).
+# -TNumber	Sets the starting address of the text section of the output file to Number. 
+# The default value is 0.
+
+# .ld a command file (also known as a linker script) to the linker 
+# either explicitly through the `-T' option, or implicitly as an ordinary file. 
+# Normally you should use the `-T' option.
+# .ld provides explicit control over the link process, allowing complete specification
+# of the mapping between the linker's input files and its output.
+
+# -Tbss org
+# -Tdata org
+# -Ttext org
+# 	Use org as the starting address for--respectively--the bss, data, or the text segment 
+#   of the output file. org must be a single hexadecimal integer; 
+# 	for compatibility with other linkers, you may omit the leading `0x' usually
+# 	associated with hexadecimal values.
+
+
+# objcopy command
+# -S
+# --strip-all
+# 		Do not copy relocation and symbol information from the source file.
+# -O:  output format
+# -j sectionname
+# --only-section=sectionname
+# Copy only the named section from the input file to the output file. This option may be given more 
+# than once. Note that using this option inappropriately may make the output file unusable.
+
+# objdump command
+# -S
+# --source
+# Display source code intermixed with disassembly, if possible. Implies -d.
+# -t
+# --syms
+# Print the symbol table entries of the file. 
+
+# bootblock.o doesn't have .data etc. so -j only copied .text 
+# By convention, the _start symbol specifies the ELF entry point
+# 	But here -e reset entry point to start
 bootblock: bootasm.S bootmain.c
 	$(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c bootmain.c
 	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c bootasm.S
@@ -120,6 +163,7 @@ initcode: initcode.S
 	$(OBJCOPY) -S -O binary initcode.out initcode
 	$(OBJDUMP) -S initcode.o > initcode.asm
 
+# _start is default entrypoint; so no need to set -e for kernel
 kernel: $(OBJS) entry.o entryother initcode kernel.ld
 	$(LD) $(LDFLAGS) -T kernel.ld -o kernel entry.o $(OBJS) -b binary initcode entryother
 	$(OBJDUMP) -S kernel > kernel.asm
@@ -137,6 +181,9 @@ kernelmemfs: $(MEMFSOBJS) entry.o entryother initcode kernel.ld fs.img
 	$(OBJDUMP) -S kernelmemfs > kernelmemfs.asm
 	$(OBJDUMP) -t kernelmemfs | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernelmemfs.sym
 
+# etags takes a collection of source files and generates an index of the definitions of all the global 
+# symbols of interest. For C and C++ programs, this index includes global and member functions, 
+# classes, structures, enums, typedefs and #defines.
 tags: $(OBJS) entryother.S _init
 	etags *.S *.c
 
@@ -145,6 +192,9 @@ vectors.S: vectors.pl
 
 ULIB = ulib.o usys.o printf.o umalloc.o
 
+# -N
+# 	--omagic
+# 	Set the text and data sections to be readable and writable.
 _%: %.o $(ULIB)
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
 	$(OBJDUMP) -S $@ > $*.asm
@@ -233,11 +283,15 @@ qemu-nox: fs.img xv6.img
 .gdbinit: .gdbinit.tmpl
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
+gdb:
+	i386-jos-elf-gdb -n -x .gdbinit
+
 qemu-gdb: fs.img xv6.img .gdbinit
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
 
 qemu-nox-gdb: fs.img xv6.img .gdbinit
+	@echo $(TOOLPREFIX) $(QEMU)
 	@echo "*** Now run 'gdb'." 1>&2
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 

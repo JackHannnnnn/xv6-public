@@ -93,6 +93,7 @@ runcmd(struct cmd *cmd)
     lcmd = (struct listcmd*)cmd;
     if(fork1() == 0)
       runcmd(lcmd->left);
+    // have to wait for previous to finish
     wait();
     runcmd(lcmd->right);
     break;
@@ -101,6 +102,7 @@ runcmd(struct cmd *cmd)
     pcmd = (struct pipecmd*)cmd;
     if(pipe(p) < 0)
       panic("pipe");
+    // two child processes: parallel execution
     if(fork1() == 0){
       close(1);
       dup(p[1]);

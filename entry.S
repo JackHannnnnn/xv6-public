@@ -47,7 +47,7 @@ entry:
   movl    %cr4, %eax
   orl     $(CR4_PSE), %eax
   movl    %eax, %cr4
-  # Set page directory
+  # Set page directory = put the physical address of the page table to the cr3 register
   movl    $(V2P_WO(entrypgdir)), %eax
   movl    %eax, %cr3
   # Turn on paging.

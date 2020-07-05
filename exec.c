@@ -10,6 +10,7 @@
 int
 exec(char *path, char **argv)
 {
+  // exec doen't create a new proces and just replace memory content of current process
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -95,7 +96,7 @@ exec(char *path, char **argv)
 
   // Commit to the user image.
   oldpgdir = curproc->pgdir;
-  curproc->pgdir = pgdir;
+  curproc->pgdir = pgdir; // Goal: replace current process
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;

@@ -15,13 +15,13 @@ extern char end[]; // first address after kernel loaded from ELF file
 
 struct run {
   struct run *next;
-};
+}; // define a struct
 
 struct {
   struct spinlock lock;
   int use_lock;
   struct run *freelist;
-} kmem;
+} kmem; // define a global variable kmem
 
 // Initialization happens in two phases.
 // 1. main() calls kinit1() while still using entrypgdir to place just
@@ -33,6 +33,7 @@ kinit1(void *vstart, void *vend)
 {
   initlock(&kmem.lock, "kmem");
   kmem.use_lock = 0;
+  // put pages corresponding to [end, 4MB] to the freelist
   freerange(vstart, vend);
 }
 
@@ -70,7 +71,7 @@ kfree(char *v)
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = (struct run*)v;
-  r->next = kmem.freelist;
+  r->next = kmem.freelist; // store the run struct inside the page itself
   kmem.freelist = r;
   if(kmem.use_lock)
     release(&kmem.lock);
@@ -91,6 +92,6 @@ kalloc(void)
     kmem.freelist = r->next;
   if(kmem.use_lock)
     release(&kmem.lock);
-  return (char*)r;
+  return (char*)r; // return a virtual address to the physical memory
 }
 
