@@ -148,7 +148,7 @@ lcr3(uint val)
 // Layout of the trap frame built on the stack by the
 // hardware and by trapasm.S, and passed to trap().
 struct trapframe {
-  // registers as pushed by pusha
+  // (eax ~ edi) registers as pushed by pushal and popped by popal
   uint edi;
   uint esi;
   uint ebp;
@@ -158,18 +158,19 @@ struct trapframe {
   uint ecx;
   uint eax;
 
-  // rest of trap frame
+  // rest of trap frame (manipulated by alltraps and trapret)
   ushort gs;
   ushort padding1;
   ushort fs;
   ushort padding2;
   ushort es;
   ushort padding3;
-  ushort ds;
+  ushort ds;  // above is controlled by alltraps()
   ushort padding4;
-  uint trapno;
+  uint trapno; // pushed by int and popped by trapret
 
-  // below here defined by x86 hardware
+  // below here defined by x86 hardware: int and iret
+  // int: save user registers  vs iret: pop user registers
   uint err;
   uint eip;
   ushort cs;
