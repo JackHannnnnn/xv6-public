@@ -13,6 +13,8 @@
 
 #define MAXARGS 10
 
+// Reason why *cmd and *redircmd etc can exchange is 
+// their struct have similar structure, first member is type.
 struct cmd {
   int type;
 };

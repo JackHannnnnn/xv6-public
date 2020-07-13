@@ -48,7 +48,9 @@ void
 freerange(void *vstart, void *vend)
 {
   char *p;
-  p = (char*)PGROUNDUP((uint)vstart);
+  // Note: groudup guarantees that physical memory is sliced into continuous 4KB blocks
+  // and no memory fragmentation; maybe exceptions for kernel physical memory
+  p = (char*)PGROUNDUP((uint)vstart); // use ceil not to free up range of address before vstart
   for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
     kfree(p);
 }

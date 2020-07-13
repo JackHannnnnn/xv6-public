@@ -50,10 +50,12 @@ sys_sbrk(void)
 
   if(argint(0, &n) < 0)
     return -1;
+  
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
-  return addr;
+  myproc()->sz = addr + n;
+  // if(growproc(n) < 0)
+  //   return -1;
+  return addr; // addr is the old top address of heap before the heap grows up
 }
 
 int

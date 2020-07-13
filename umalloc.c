@@ -51,11 +51,11 @@ morecore(uint nu)
 
   if(nu < 4096)
     nu = 4096;
-  p = sbrk(nu * sizeof(Header));
-  if(p == (char*)-1)
+  p = sbrk(nu * sizeof(Header)); // p is starting address of newly allocated block of memory
+  if(p == (char*)-1) // syscall returns -1
     return 0;
   hp = (Header*)p;
-  hp->s.size = nu;
+  hp->s.size = nu; // size of newly allocated heap memory
   free((void*)(hp + 1));
   return freep;
 }

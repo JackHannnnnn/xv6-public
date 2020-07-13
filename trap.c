@@ -32,6 +32,29 @@ idtinit(void)
   lidt(idt, sizeof(idt));
 }
 
+int
+mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
+void handlepagefault(struct trapframe *tf) {
+    uint va;
+    char *mem;
+    va = rcr2();
+    cprintf("pid %d %s: trap page fault err on cpu %d "
+            "eip 0x%x addr 0x%x\n",
+            myproc()->pid, myproc()->name, cpuid(), tf->eip, va);
+
+    mem = kalloc();
+    if(mem == 0){
+      cprintf("allocuvm out of memory -- kill proc\n");
+      myproc()->killed = 1;
+    }
+    memset(mem, 0, PGSIZE);
+    if(mappages(myproc()->pgdir, (char*)PGROUNDDOWN(va), PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
+      cprintf("allocuvm out of memory (2) -- kill proc\n");
+      kfree(mem);
+      myproc()->killed = 1;
+    }
+}
+
 //PAGEBREAK: 41
 void
 trap(struct trapframe *tf)
@@ -77,7 +100,9 @@ trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
-
+  case T_PGFLT:
+    handlepagefault(tf);
+    break;
   //PAGEBREAK: 13
   default:
     if(myproc() == 0 || (tf->cs&3) == 0){

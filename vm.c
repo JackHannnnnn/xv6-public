@@ -50,6 +50,7 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
     // The permissions here are overly generous, but they can
     // be further restricted by the permissions in the page table
     // entries, if necessary.
+    // Note: pgtab has 0 for all 12 trailing digits
     *pde = V2P(pgtab) | PTE_P | PTE_W | PTE_U;
   }
   return &pgtab[PTX(va)];
@@ -58,7 +59,10 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
-static int
+// Note: based on how mapages is called, pa is almost always obtained
+// from pa = kalloc() which guarantees that its rightmost 12 bits are 0s
+// exception is setupkvm
+int
 mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 {
   char *a, *last;
@@ -67,14 +71,15 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
   // range[va, va+size] may contain multiple pages
   a = (char*)PGROUNDDOWN((uint)va);
   last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
+  // as you put check of a== last after allocating space so that
+  // you always allocate enough (at most 1 more page) space for [va, va+size] 
   for(;;){
     // 1. find the page table entry using top 20 bits of va
     if((pte = walkpgdir(pgdir, a, 1)) == 0)
       return -1;
     if(*pte & PTE_P)
-      panic("remap");
+      panic("remap"); // this va is already used before in current process
     // 2. assign pa | perm to the page table entry
-    // Note: each pa is aligned such that trailing digits are 0s
     *pte = pa | perm | PTE_P; // what page table entry consists of
     if(a == last) // finish assigning all mappings for all designated pages
       break;
@@ -120,6 +125,8 @@ static struct kmap {
 };
 
 // Set up kernel part of a page table.
+// Note: kernel is already loaded into right position of physical memory,
+// and here it just creats the mapping of va->pa
 pde_t*
 setupkvm(void)
 {
@@ -127,6 +134,7 @@ setupkvm(void)
   struct kmap *k;
 
   // allocate one page to store the page table for kernel
+  // each user process will call setupkvm to have its own page dir
   if((pgdir = (pde_t*)kalloc()) == 0)
     return 0;
   // clean the page table first
@@ -136,6 +144,10 @@ setupkvm(void)
   // Configure the page table to include appropriate mappings of va -> pa
   for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
     // assign all mappings for kernel
+    // Note: pa may have non-0 in right most 20 bits. But it's fine as
+    // each user process only calls setupkvm once and create the mapping
+    // for kernel address space once and therefore check `if(*pte & PTE_P)`
+    // won't happen for setupkvm
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
                 (uint)k->phys_start, k->perm) < 0) {
       freevm(pgdir);
@@ -195,6 +207,7 @@ inituvm(pde_t *pgdir, char *init, uint sz)
 
   if(sz >= PGSIZE)
     panic("inituvm: more than a page");
+  // find unused physical memory to load this process's text
   mem = kalloc();
   memset(mem, 0, PGSIZE);
   mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U);
@@ -238,17 +251,19 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   if(newsz < oldsz)
     return oldsz;
 
-  a = PGROUNDUP(oldsz);
+  a = PGROUNDUP(oldsz); // Note: why round up? Because e.g. size = newsz - oldsz = 3.6
+  // you still allocate 4 pages. But you return oldsz + 3.6 = newsz instead of oldsz + 4.
+  // so next time allouvm is called, you round up to next aligned address
   for(; a < newsz; a += PGSIZE){
-    mem = kalloc();
+    mem = kalloc(); // allocate one page of physical memory
     if(mem == 0){
       cprintf("allocuvm out of memory\n");
       deallocuvm(pgdir, newsz, oldsz);
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    // pde won't exist, so need to call kalloc to create a table for va
-    // also call kalloc to allocate physical memory to store program data
+    // create a mapping from a to V2P(mem); pde might exist but pte
+    // must not exist (otherwise this va is already used)
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
       cprintf("allocuvm out of memory (2)\n");
       deallocuvm(pgdir, newsz, oldsz);
