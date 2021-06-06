@@ -65,4 +65,8 @@ entry:
   mov $main, %eax
   jmp *%eax
 
+# .comm declares a common symbol named symbol. When linking, a common symbol in one object file may be merged with 
+# a defined or common symbol of the same name in another object file. 
+# If ld does not see a definition for the symbol--then it will allocate length bytes of uninitialized memory.
+# Note: stack is not found in other files. It points to next available memory address in .bss
 .comm stack, KSTACKSIZE

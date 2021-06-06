@@ -59,9 +59,6 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
-// Note: based on how mapages is called, pa is almost always obtained
-// from pa = kalloc() which guarantees that its rightmost 12 bits are 0s
-// exception is setupkvm
 int
 mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 {
@@ -71,6 +68,7 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
   // range[va, va+size] may contain multiple pages
   a = (char*)PGROUNDDOWN((uint)va);
   last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
+  // cprintf("mappages: %p, %p, %x, %x\n", pgdir, va, size, pa);
   // as you put check of a== last after allocating space so that
   // you always allocate enough (at most 1 more page) space for [va, va+size] 
   for(;;){
@@ -106,12 +104,19 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 //                                  rw data + free physical memory
 //   0xfe000000..0: mapped direct (devices such as ioapic)
 //
-// The kernel allocates physical memory for its heap and for user memory
+// The kernel allocates physical memory for its heap and for user memory([0, KERNBASE])
 // between V2P(end) and the end of physical memory (PHYSTOP)
 // (directly addressable from end..P2V(PHYSTOP)).
 
-// This table defines the kernel's mappings, which are present in
+// CH: This table defines the kernel's mappings, which are present in
 // every process's page table.
+// Every process has the same mappings for high VAs above KERNBASE through setupkvm(), which is why these works:
+//  1. pgdir = (pde_t*)kalloc(), then memset(pgdir, 0, PGSIZE); CPU knows how to find the pa even though
+//              kalloc() returns a va.
+//        Note: it doesn't matter kalloc/kfree uses pa or va because they are always called in kernel mode
+//              and in kernel mode each process has same kernel mapping
+//  2. each process stores 2-level page tables in different physical memory, but page table entries for VAs above KERNBASE are same. 
+//     The difference in mapping among processes is that user memory [0, KERNBASE] always maps to different pa.
 static struct kmap {
   void *virt;
   uint phys_start;
@@ -121,7 +126,7 @@ static struct kmap {
  { (void*)KERNBASE, 0,             EXTMEM,    PTE_W}, // I/O space
  { (void*)KERNLINK, V2P(KERNLINK), V2P(data), 0},     // kern text+rodata
  { (void*)data,     V2P(data),     PHYSTOP,   PTE_W}, // kern data+memory
- { (void*)DEVSPACE, DEVSPACE,      0,         PTE_W}, // more devices
+ { (void*)DEVSPACE, DEVSPACE,      0,         PTE_W}, // more devices | 0 - DEVSPACE = 0x2000000 = 32MB
 };
 
 // Set up kernel part of a page table.
@@ -142,17 +147,19 @@ setupkvm(void)
   if (P2V(PHYSTOP) > (void*)DEVSPACE)
     panic("PHYSTOP too high");
   // Configure the page table to include appropriate mappings of va -> pa
-  for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
+  for(k = kmap; k < &kmap[NELEM(kmap)]; k++) {
     // assign all mappings for kernel
     // Note: pa may have non-0 in right most 20 bits. But it's fine as
     // each user process only calls setupkvm once and create the mapping
     // for kernel address space once and therefore check `if(*pte & PTE_P)`
     // won't happen for setupkvm
+    // cprintf("kmap: %p, %x, %x, %d\n", k->virt, k->phys_start, k->phys_end, k->perm);
     if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
                 (uint)k->phys_start, k->perm) < 0) {
       freevm(pgdir);
       return 0;
     }
+  }
   return pgdir;
 }
 

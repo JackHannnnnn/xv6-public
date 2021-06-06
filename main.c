@@ -9,7 +9,7 @@
 static void startothers(void);
 static void mpmain(void)  __attribute__((noreturn));
 extern pde_t *kpgdir;
-extern char end[]; // first address after kernel loaded from ELF file
+extern char end[]; // first address after kernel loaded from ELF file = .bss's loading pa(10a520) + its size(af88)=801154a8
 
 // Bootstrap processor starts running C code here.
 // Allocate a real stack and switch to it, first
@@ -20,7 +20,8 @@ main(void)
   // clear the virtual address range from end to P2V(4*1024*1024)
   // [0, 4MB] used by entrypgdir, now before switch to kernal page table,
   // first clean address range [end, 4MB],
-  // Then the pa of kernal page table should start at the address exactly following end;
+  // Then the pa of kernal page table should start at the address exactly following 4MB, namely 0x803ff000
+  // (as top memory always is allocated first from the kmem.freelist);
   // Goal: Free up space to allocate space for kernel page table (4MB-end is enough)
   kinit1(end, P2V(4*1024*1024)); // phys page allocator  // (4MB) 0x 4 000 00
   kvmalloc();      // kernel page table
