@@ -8,17 +8,17 @@
 
 .globl swtch
 swtch:
-  movl 4(%esp), %eax
-  movl 8(%esp), %edx
+  movl 4(%esp), %eax # old context
+  movl 8(%esp), %edx # new context
 
-  # Save old callee-saved registers
+  # Save old callee-saved registers | init old context
   pushl %ebp
   pushl %ebx
   pushl %esi
   pushl %edi
 
   # Switch stacks
-  movl %esp, (%eax)
+  movl %esp, (%eax) # context pointer = stack pointer
   movl %edx, %esp
 
   # Load new callee-saved registers

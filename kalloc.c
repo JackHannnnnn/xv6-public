@@ -94,6 +94,7 @@ kalloc(void)
     kmem.freelist = r->next;
   if(kmem.use_lock)
     release(&kmem.lock);
+  // Key: every process has a kernal page table mapping the high VAs [KERNBASE, KERNBASE+]
   return (char*)r; // return a virtual address to the physical memory
 }
 
