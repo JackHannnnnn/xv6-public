@@ -13,8 +13,8 @@ thread_switch:
 	movl next_thread, %eax
 	movl (%eax), %esp
 	popal
-    movl next_thread, %eax
-    movl %eax, current_thread
-    movl $0, %eax
-    movl %eax, next_thread
+	movl next_thread, %eax
+	movl %eax, current_thread
+	movl $0, %eax
+	movl %eax, next_thread
 	ret				/* pop return address from stack */
